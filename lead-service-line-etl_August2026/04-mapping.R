@@ -1,8 +1,16 @@
 # setup ------------------------------------------------------------------
 
-pacman::p_load("readr", "dplyr", "sf", "mapview", "gtsummary")
+pacman::p_load("readr", "dplyr", "sf", "mapview", "gtsummary", "leaflet")
 
 dir <- here::here("lead-service-line-etl_August2026")
+
+readRenviron("C:\\Users\\stm4z\\OneDrive - branchfour.org\\Scripts\\.env")
+
+carto_key <- Sys.getenv("CARTO_API_KEY")
+if (carto_key == "") stop("CARTO_API_KEY not found - set it in .Renviron")
+
+Sys.setenv(CHROMOTE_CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe")
+
 
 # import data ------------------------------------------------------------
 
@@ -22,14 +30,44 @@ data_sf <- data |>
 # remove the incomplete addresses (ones without a street number)
 data_sf <- data_sf |> filter(flag_incomplete == 0)
 
-# create map -------------------------------------------------------------
-
 lead_yes <- data_sf |> filter(suspected_lead == "Y")
 lead_no <- data_sf |> filter(suspected_lead == "N")
+
+
+# build base map with carto API key ----------------------------------------
+
+carto_attr <- '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
+
+
+base_map <- leaflet() |>
+  addTiles(
+    urlTemplate = paste0(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=",
+      carto_key
+    ),
+    attribution = carto_attr,
+    group = "CartoDB.Positron",
+    options = tileOptions(subdomains = "abcd")
+  ) |>
+  addTiles(
+    urlTemplate = paste0(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=",
+      carto_key
+    ),
+    attribution = carto_attr,
+    group = "CartoDB.DarkMatter",
+    options = tileOptions(subdomains = "abcd")
+  ) |>
+  addLayersControl(baseGroups = c("CartoDB.Positron", "CartoDB.DarkMatter")) |>
+  setView(lng = 0, lat = 0, zoom = 13.5)  # Adjust the zoom level here (e.g., 12)
+
+# create map -------------------------------------------------------------
+
 
 map <-
   mapview(
     lead_no,
+    map = base_map,
     layer.name = "Suspected lead - No",
     col.regions = "#4B0055",
     color = "#FFFFFF",
