@@ -30,8 +30,14 @@ data_sf <- data |>
 # remove the incomplete addresses (ones without a street number)
 data_sf <- data_sf |> filter(flag_incomplete == 0)
 
-lead_yes <- data_sf |> filter(suspected_lead == "Y")
-lead_no <- data_sf |> filter(suspected_lead == "N")
+# clean data_df for map
+data_sf <- data_sf |> 
+  select(Address=address_full, "Suspected Lead"=suspected_lead, latitude, longitude, geometry) |>
+  mutate(`Suspected Lead` = if_else(`Suspected Lead`=="Y", "Yes", 
+                                    if_else(`Suspected Lead`=="N", "No", "NA"), "NA") )
+
+lead_yes <- data_sf |> filter(`Suspected Lead` == "Yes")
+lead_no <- data_sf |> filter(`Suspected Lead` == "No")
 
 
 # build base map with carto API key ----------------------------------------
@@ -58,8 +64,8 @@ base_map <- leaflet() |>
     group = "CartoDB.DarkMatter",
     options = tileOptions(subdomains = "abcd")
   ) |>
-  addLayersControl(baseGroups = c("CartoDB.Positron", "CartoDB.DarkMatter")) |>
-  setView(lng = 0, lat = 0, zoom = 13.5)  # Adjust the zoom level here (e.g., 12)
+  addLayersControl(baseGroups = c("CartoDB.Positron", "CartoDB.DarkMatter"), position = "bottomleft") |>
+  setView(lng = 0, lat = 0, zoom = 14)  # Adjust the zoom level here (e.g., 12)
 
 # create map -------------------------------------------------------------
 
@@ -71,12 +77,14 @@ map <-
     layer.name = "Suspected lead - No",
     col.regions = "#4B0055",
     color = "#FFFFFF",
-    lwd = 1
+    lwd = 1,
+    homebutton = FALSE
   ) +
   mapview(
     lead_yes,
     layer.name = "Suspected lead - Yes",
-    col.regions = "#FDE333"
+    col.regions = "#FDE333",
+    homebutton = FALSE
   )
 
 # summary table ----------------------------------------------------------
@@ -85,7 +93,7 @@ table <-
   data_sf |>
   sf::st_drop_geometry() |>
   mutate(line_id = row_number()) |>
-  tbl_summary(include = c(suspected_lead)) |>
+  tbl_summary(include = c(`Suspected Lead`)) |>
   modify_caption("Proportion of service lines suspected of lead") |>
   as_gt()
 
